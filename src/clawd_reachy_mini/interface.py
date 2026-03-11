@@ -99,6 +99,19 @@ class ReachyInterface:
             await asyncio.to_thread(self._reachy.wake_up)
             await asyncio.sleep(0.5)
 
+        # Log audio output status
+        reachy_audio = (
+            self._reachy
+            and hasattr(self._reachy, "media")
+            and hasattr(self._reachy.media, "audio")
+            and self._reachy.media.audio is not None
+            and getattr(self._reachy.media.audio, "_audio_send_ready", False)
+        )
+        if reachy_audio:
+            logger.info("🔊 Robot audio output: WebRTC (playing on robot speakers)")
+        else:
+            logger.info("🔊 Robot audio output: local Mac (afplay) — WebRTC audio send unavailable")
+
         logger.info("✨ Reachy Mini interface started")
         logger.info("=" * 50)
         if self.config.wake_word:
@@ -182,9 +195,13 @@ class ReachyInterface:
         self.state = InterfaceState.PROCESSING
         logger.info("🔄 Processing speech...")
         try:
-            text = await asyncio.to_thread(
-                self._stt.transcribe, audio, self.config.sample_rate
+            text = await asyncio.wait_for(
+                asyncio.to_thread(self._stt.transcribe, audio, self.config.sample_rate),
+                timeout=30.0,
             )
+        except asyncio.TimeoutError:
+            logger.error("Transcription timed out after 30s — consider switching to faster-whisper or openai STT backend")
+            return
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
             return
@@ -272,7 +289,12 @@ class ReachyInterface:
         """Connect to Reachy Mini robot."""
         try:
             from reachy_mini import ReachyMini
+        except ImportError as e:
+            logger.warning(f"reachy-mini import failed ({e}), running in simulation mode")
+            self._reachy = None
+            return
 
+        try:
             kwargs = {}
             if self.config.reachy_connection_mode != "auto":
                 kwargs["connection_mode"] = self.config.reachy_connection_mode
@@ -284,11 +306,8 @@ class ReachyInterface:
 
             logger.info("Connected to Reachy Mini")
 
-        except ImportError:
-            logger.warning("reachy-mini not installed, running in simulation mode")
-            self._reachy = None
         except Exception as e:
-            logger.error(f"Failed to connect to Reachy Mini: {e}")
+            logger.error(f"Failed to connect to Reachy Mini: {e}", exc_info=True)
             self._reachy = None
 
     async def _speak(self, text: str) -> None:
@@ -308,8 +327,15 @@ class ReachyInterface:
                 voice_settings={"use_speaker_boost": True},
             )
 
-            # Play through Reachy Mini if available
-            if self._reachy and hasattr(self._reachy, "media"):
+            # Play through Reachy Mini if audio send is actually working
+            reachy_audio_ready = (
+                self._reachy
+                and hasattr(self._reachy, "media")
+                and hasattr(self._reachy.media, "audio")
+                and self._reachy.media.audio is not None
+                and getattr(self._reachy.media.audio, "_audio_send_ready", False)
+            )
+            if reachy_audio_ready:
                 try:
                     # Convert generated audio to 16k mono wav for Reachy
                     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as wf:

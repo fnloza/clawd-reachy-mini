@@ -19,8 +19,8 @@ class Config:
     reachy_media_backend: str = "default"  # "default" or "gstreamer"
 
     # Speech-to-text
-    stt_backend: str = "whisper"  # "whisper", "faster-whisper", "openai"
-    whisper_model: str = "base"  # "tiny", "base", "small", "medium", "large"
+    stt_backend: str = "mlx-whisper"  # "mlx-whisper", "whisper", "faster-whisper", "openai"
+    whisper_model: str = "tiny"  # "tiny", "base", "small", "medium", "large"
     openai_api_key: str | None = None
 
     # Text-to-speech
@@ -61,7 +61,7 @@ def load_config() -> Config:
     return Config(
         gateway_host=os.environ.get("OPENCLAW_HOST", "127.0.0.1"),
         gateway_port=int(os.environ.get("OPENCLAW_PORT", "18789")),
-        stt_backend=os.environ.get("STT_BACKEND", "whisper"),
-        whisper_model=os.environ.get("WHISPER_MODEL", "base"),
+        stt_backend=os.environ.get("STT_BACKEND", "mlx-whisper"),
+        whisper_model=os.environ.get("WHISPER_MODEL", "tiny"),
         wake_word=os.environ.get("WAKE_WORD"),
     )

@@ -63,15 +63,15 @@ def parse_args() -> argparse.Namespace:
     # STT options
     parser.add_argument(
         "--stt",
-        choices=["whisper", "faster-whisper", "openai"],
-        default="whisper",
-        help="Speech-to-text backend",
+        choices=["mlx-whisper", "whisper", "faster-whisper", "openai"],
+        default=None,
+        help="Speech-to-text backend (default: from config/STT_BACKEND env)",
     )
     parser.add_argument(
         "--whisper-model",
         choices=["tiny", "base", "small", "medium", "large"],
-        default="base",
-        help="Whisper model size",
+        default=None,
+        help="Whisper model size (default: from config/WHISPER_MODEL env)",
     )
 
     # Audio options
@@ -121,8 +121,10 @@ def create_config(args: argparse.Namespace) -> Config:
 
     config.reachy_connection_mode = args.reachy_mode
     config.audio_device = args.audio_device
-    config.stt_backend = args.stt
-    config.whisper_model = args.whisper_model
+    if args.stt is not None:
+        config.stt_backend = args.stt
+    if args.whisper_model is not None:
+        config.whisper_model = args.whisper_model
     config.wake_word = args.wake_word
     config.play_emotions = not args.no_emotions
     config.idle_animations = not args.no_idle
@@ -247,8 +249,33 @@ async def async_main(config: Config) -> int:
     return 0
 
 
+def _load_dotenv() -> None:
+    """Load .env file into environment without overwriting existing vars."""
+    import os
+    from pathlib import Path
+    env_path = Path(".env")
+    if not env_path.exists():
+        return
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
 def main() -> None:
     """Main entry point."""
+    import os
+    # Must be set before any native libs (CTranslate2, OpenMP) are loaded
+    os.environ.setdefault("OMP_NUM_THREADS", "1")
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+    _load_dotenv()
+
     args = parse_args()
     setup_logging(args.verbose)
 

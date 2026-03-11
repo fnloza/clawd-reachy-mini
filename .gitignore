@@ -36,6 +36,11 @@ ENV/
 .coverage
 htmlcov/
 
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
 # Local data
 .clawd-reachy-mini/
 captures/

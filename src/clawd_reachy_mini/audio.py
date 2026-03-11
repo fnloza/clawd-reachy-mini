@@ -180,8 +180,8 @@ class AudioCapture:
                 self._input_stream.start()
                 logger.debug(f"Started audio input stream on device {self._device_id}")
 
-            # Read available data
-            data, overflowed = self._input_stream.read(frames)
+            # Read available data (blocking — run in thread to avoid blocking the event loop)
+            data, overflowed = await asyncio.to_thread(self._input_stream.read, frames)
             if overflowed:
                 logger.warning("Audio buffer overflow - some audio was lost")
             return data.flatten()

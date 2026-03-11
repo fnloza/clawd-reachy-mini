@@ -348,6 +348,10 @@ class GatewayClient:
                         "mode": "backend",
                     },
                     "role": "operator",
+                    "scopes": [
+                        "operator.read",
+                        "operator.write",
+                    ],
                     "auth": {
                         "token": self.config.gateway_token or "",
                     },
